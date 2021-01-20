@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="https://www.cwb.gov.tw/cwbwifi/styles/timeline.css">
+    <link rel="stylesheet" href="styles/styles.css">
+    <title>Title</title>
+</head>
+<body>
+<div id="display">
+    <!--div id="tgMap" style="width: 100vw; height: 100vh;"></div-->
+    <svg id="map" class="fill-screen invisible" xmlns="http://www.w3.org/2000/svg" version="1.1"></svg>
+    <canvas id="animation" class="fill-screen overlay-animation"></canvas>
+    <canvas id="overlay" class="fill-screen overlay-base"></canvas>
+    <canvas id="overlay2" class="fill-screen invisible overlay-base"></canvas>
+    <svg id="foreground" class="fill-screen invisible" xmlns="http://www.w3.org/2000/svg" version="1.1"></svg>
+    <svg id="sea-mask" class="fill-screen invisible" xmlns="http://www.w3.org/2000/svg" version="1.1"></svg>
+</div>
+<div style="display: none;">
+    <div id="details">
+    <div id="earth">
+        <div id="show-menu" class="text-button" title="menu"></div>
+        <div id="cwb-logo"></div>
+        <div id="select-list" class="">
+            <p>
+                資料選擇：
+                <select id="overlay-select">
+                    <option value="wind">風速</option>
+                    <option value="temp">溫度</option>
+                    <option value="pres">氣壓</option>
+                    <option value="taprecip">累積雨量</option>
+                    <option value="cloud">雲量</option>
+                    <!--<option value="htsgw">浪高</option>-->
+                </select>
+            </p>
+            <p>
+                高度：
+                <select id="level-select">
+                    <option value="sfc">地面</option>
+                    <option value="1000hPa">1000 hPa</option>
+                    <option value="925hPa">925 hPa</option>
+                    <option value="850hPa">850 hPa</option>
+                    <option value="700hPa">700 hPa</option>
+                    <option value="500hPa">500 hPa</option>
+                </select>
+            </p>
+            <p id="datetime">
+                資料時間：
+                <select id="calendar-select" name="path"></select>
+            </p>
+            <p class="invisible"><span id="scale-label">尺度: </span><canvas id="scale"></canvas></p>
+            <p style="display:inline;">
+                風場動畫：
+            <div class="pause" id="playanime" data-name="play" title="停止動畫"></div>
+            </p>
+            <p>
+                <a href="CWB_about.html" class="internal-link">關於</a>
+            </p>
+        </div>
+    </div>
+</div>
+    <div id="location">
+    <p>
+        <span id="location-coord"></span>
+        <span id="location-close" class="invisible text-button"> ✕ </span>
+    </p>
+    <p>
+        <span id="location-wind"></span>
+        <span id="location-wind-units"></span>
+    </p>
+    <p>
+        <span id="location-value"></span>
+        <span id="location-value-units"></span>
+    </p>
+</div>
+    <div id="status-show">
+    <p id="status"></p>
+    <span id="progress" class="invisible"></span>
+</div>
+    <div id="color-bar"></div>
+    <div id="test-info" class="invisible">
+    <p>內部測試調教用</p>
+    <p>資料尚無即時資料更新</p>
+</div>
+    <div id="bottom" class="shy">
+    <div class="bottom-part-wrapper">
+        <div class="play" id="playpause-mobile" data-name="play"></div>
+        <div id="timeline-bar-wrapper" class="show_on_startup">
+            <div id="timeline-bar">
+                <div id="timeline">
+                    <div id="timeline-inset">
+                        <div id="timeline-line" class="played"></div>
+                        <div id="ghost-timecode">
+                            <div id="ghost-box" class="box"></div>
+                        </div>
+                        <div id="timecode" data-title="D_LT2" class="timecode">
+                            <div id="timecode-box" class="box"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="calendar-wrapper">
+                    <div class="play" id="playpause" data-name="play"></div>
+                    <div id="calendar"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+<script src="http://api.tgos.tw/TGOS_API/tgos?ver=2&AppID=P++U+W6DarjHegV8XPlUr/FLQTCQjsoazb/X0CRDt+I/M6FIjq7obw==&APIKey=cGEErDNy5yN/1fQ0vyTOZrghjE+jIU6uHB8k/uGoGxncj6B2kmsJ1OM/zyT3nXy049PZDhNF41inruyEN8ps59JUQ4h+CXlNBt8PIrs5q7F2je4cisLevxNbEtU6SusnwdOb72ZDCD9gM8xJLUx3Go2H9sV1s65WoRFHb4xHwUOJL0+uhaKDbqIiHqjYDSXcxN5oC4BTQiqzRyRydpgru6JUBh99cTZBxpllTpSeKD0cGzR97sR9IiIzrSOfslGZT2l1/Fl0bCloV7LMEI8Jh0JgDJKxc7PtbxYM5RQGAX5aetEX3VzJTQXrQBRWHErLumV1i+1NhwGwQsKLsdlMAVk5XgaPsAjpr9IJTMiMaGJbJpfhad0OG5HvSkHChNGXmBj1QmO2xTQ53MgGMIHQedJX4m4gKK1iVVzZ9kDufcvNchR0mU9nrQ==" charset="utf-8"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.6.0/underscore-min.js" charset="utf-8"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/backbone.js/1.1.0/backbone-min.js" charset="utf-8"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/1.1.0/topojson.min.js" charset="utf-8"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.3.10/d3.min.js" charset="utf-8"></script>
+
+<!--
+<script src="/libs/underscore.js/1.6.0/underscore.js" charset="utf-8"></script>
+<script src="/libs/backbone.js/1.1.0/backbone.js" charset="utf-8"></script>
+<script src="/libs/topojson/1.1.0/topojson.js" charset="utf-8"></script>
+<script src="/libs/d3/3.3.10/d3.js" charset="utf-8"></script>
+-->
+
+<script src="https://www.cwb.gov.tw/cwbwifi/libs/d3.geo/0.0.0/d3.geo.projection.v0.min.js" charset="utf-8"></script>
+<script src="https://www.cwb.gov.tw/cwbwifi/libs/d3.geo/0.0.0/d3.geo.polyhedron.v0.min.js" charset="utf-8"></script>
+<script src="js/when.js" charset="utf-8"></script>
+
+<script src="js/micro.js" charset="utf-8"></script>
+<script src="js/globes.js" charset="utf-8"></script>
+<script src="js/products.js" charset="utf-8"></script>
+<script src="js/timeline.js" charset="utf-8"></script>
+<script src="js/earth.js" charset="utf-8"></script>
+
+
+<!--script>
+    let pMap = new TGOS.TGOnlineMap(document.getElementById('tgMap'), TGOS.TGCoordSys.EPSG3857);
+    pMap.setMapTypeId('NLSCMAP');
+    pMap.setCenter(new TGOS.TGPoint(120.5, 23.75));
+    pMap.setZoom(6);
+    pMap.setOptions({
+        mapTypeControl: false,
+        scaleControl: false,
+        navigationControl: false,
+        mapBounds: new TGOS.TGEnvelope(113.5884760904839, 27.57144206466311,
+            130.5634772598658, 20.437573393627737),
+        minZoom: 6
+    });
+</script>-->
+
+</body>
+</html>

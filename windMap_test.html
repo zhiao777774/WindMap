@@ -1,0 +1,714 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+    <script src="http://d3js.org/d3.v4.min.js" charset="utf-8"></script>
+    <script src="https://d3js.org/d3-geo.v1.min.js"></script>
+
+    <link rel="stylesheet" type="text/css" href="assets/css/line_style.css">
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.3.4/dist/leaflet.css" integrity="sha512-puBpdR0798OZvTTbP4A8Ix/l+A4dHDD0DGqYW6RQ+9jxkRFclaxxQb/SJAWZfWAkuyeQUytO7+7N4QKrDh+drA==" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.3.4/dist/leaflet.js" integrity="sha512-nMMmRyTVoLYqjP9hrbed9S+FzjZHW5gY1TWCHA5ckwXZBadntCNs8kEqAWdrb9O7rxbCaA4lKTIWjDXZxflOcA==" crossorigin=""></script>
+    <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet/v0.7.7/leaflet.css" />
+    <script src="http://cdn.leafletjs.com/leaflet/v0.7.7/leaflet.js"></script>
+
+    <link rel="stylesheet" href="assets/css/slider_right.css" />
+    <link rel="stylesheet" href="assets/css/slider_left.css" />
+    <script type='text/javascript' src='http://code.jquery.com/jquery-1.9.1.min.js'></script>
+    <script type="text/javascript" src="assets/js/slider.js"></script>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    <script type="text/javascript" src="https://api.tgos.tw/TGOS_API/tgos?ver=2&AppID=P++U+W6DarjHegV8XPlUr/FLQTCQjsoazb/X0CRDt+I/M6FIjq7obw==&APIKey=cGEErDNy5yN/1fQ0vyTOZrghjE+jIU6uHB8k/uGoGxncj6B2kmsJ1OM/zyT3nXy049PZDhNF41inruyEN8ps59JUQ4h+CXlNBt8PIrs5q7F2je4cisLevxNbEtU6SusnwdOb72ZDCD9gM8xJLUx3Go2H9sV1s65WoRFHb4xHwUOJL0+uhaKDbqIiHqjYDSXcxN5oC4BTQiqzRyRydpgru6JUBh99cTZBxpllTpSeKD0cGzR97sR9IiIzrSOfslGZT2l1/Fl0bCloV7LMEI8Jh0JgDJKxc7PtbxYM5RQGAX5aetEX3VzJTQXrQBRWHErLumV1i+1NhwGwQsKLsdlMAVk5XgaPsAjpr9IJTMiMaGJbJpfhad0OG5HvSkHChNGXmBj1QmO2xTQ53MgGMIHQedJX4m4gKK1iVVzZ9kDufcvNchR0mU9nrQ==" charset="utf-8"></script>
+
+    <link rel="stylesheet" href="assets/css/table_and_tree.css" />
+</head>
+
+<body>
+    <div id="mapDiv" style="width: 100%; height: 715px; border: 0px solid #C0C0C0; position: fixed;">
+        <div id="mwt_mwt_slider_scroll">
+            <div id="mwt_fb_tab">
+            </div>
+            <div id="mwt_slider_content">
+                <label>Start time from:</label><br>
+                <input type="datetime-local" id="StartLocalDate" value="2019-09-26T07:49" /><br>
+                <label>to</label><br>
+                <input type="datetime-local" id="EndLocalDate" value="2019-09-26T19:49" /><br>
+                <button type="button" onclick="btnSearch_click()">Search!</button>
+                <ul id="treelist" class="tree"></ul>
+                <form>
+                    <label>Show line information about:</label>
+                    <select id="mySelect"></select>
+                </form>
+                <table id="myTable" style="width:100%"></table>
+                <button type="button" onclick="animation_click()" id="anibtn">Pause</button>
+            </div>
+        </div>
+        <!-- time zone的背景
+        <div id="slider_scroll">
+            <div id="slider_content">
+                <canvas id="canvas" width="320" height="320">cccc</canvas>
+            </div>
+        </div>
+         -->
+    </div>
+    <iframe id="windMap-frame" src="../Seaway_jpyu/WindMap/" style="position: fixed; width: 100vw; border-width: 0; height: 715px;"></iframe>
+
+    <script type="text/javascript" src="assets/js/compass_raphael.js"></script>
+    <script type="text/javascript" src="assets/js/compass.js"></script>
+    <!--<script type="text/javascript" src="assets/js/clock.js"></script> -->
+    <script>
+        var animation = false;
+        var mapDiv, map;
+        var svg, one_g, lineid; //實做onAdd，設定疊加層
+        var now, sec;
+		var d3path = null;
+        var customLayer1 = null;
+        
+        var CustomLayer = function(map) { //客制化圖層
+            this.width = 960;
+            this.height = 500;
+            //this.rightBottom = new TGOS.TGPoint(124.57836360169523, 21.895638565608042);
+            this.setMap(map);
+        }
+        CustomLayer.prototype = new TGOS.TGOverlayView(); //繼承TGOS.TGOverlayView
+        
+        CustomLayer.prototype.onAdd = function() {
+            console.log("CustomLayer_onAdd()");
+            //取得欲套疊的地圖承載層
+            var panes = this.getPanes();
+            var mapLayer = panes.overlayviewLayer;
+
+            //設定疊加層座標系統
+            this.mSRS = this.map.getCoordSys();
+
+            if (document.getElementById("d3Div") == null) {
+                //設定疊加層HTML 物件(DIV)
+                this.div = document.createElement("div");
+                this.div.id = "d3Div";
+                this.div.style.position = "absolute";
+            } else
+                this.div = document.getElementById("d3Div");
+
+            //設定定疊加層寬度
+            this.div.style.width = "100%";
+
+            //設定定疊加層高度
+            this.div.style.height = "100%";
+            this.div.className = "stations";
+
+            //設定定疊加層HTML物件 Style
+            this.div.style.zIndex = 1000;
+
+            //將div加入至現有圖層中
+            mapLayer.appendChild(this.div);
+            var width = this.width,
+                height = this.height;
+        }
+
+        //實做onDraw
+        CustomLayer.prototype.onDraw = function() {
+            var me = this;
+            console.log("CustomLayer_onDraw()");
+            document.getElementById('d3Div').innerHTML = '';
+
+            svg = d3.select("#d3Div").append("svg");
+            one_g = svg.append("g").attr("class", "leaflet-zoom-hide");
+            this.proj = this.getProjection();
+            const transform = d3.geoTransform({
+                point: me.projectPoint
+            });
+            d3path = d3.geoPath().projection(transform);
+
+            me.checkShipStatus();
+        }
+
+        CustomLayer.prototype.onRemove = function() {
+            console.log("CustomLayer_onRemove()");
+            //            this.div.parentNode.removeChild(this.div);
+            //            this.div = null;
+
+        }
+        
+        CustomLayer.prototype.projectPoint = function(x, y){
+            var me = this;
+            if(typeof(me.proj) == 'undefined') return null;
+                var pt = new TGOS.TGPoint(x, y);
+                var p = me.proj.fromMapToDiv(pt);
+                var padding = 16;
+                this.stream.point(p.x - padding, p.y - padding);
+        }
+        
+        CustomLayer.prototype.applyLatLngToLayer = function(d){
+            var me = this;
+                return me.proj.fromMapToDiv(new TGOS.TGPoint(d.geometry.coordinates[0], d.geometry.coordinates[1]));
+            
+        }
+
+        CustomLayer.prototype.checkShipStatus = function(){
+            var me = this;
+            var inputs = document.getElementsByTagName('input');
+            for (var index = 0; index < inputs.length; ++index) {
+                if (document.getElementById(inputs[index].id).checked == true) {
+                    if (inputs[index].id.split("_")[0] == "line") {
+                        var line_id = inputs[index].id.split("_")[1];
+                        var dataFile = "data/" + inputs[index].id.split("_")[1] + ".geojson";
+                        me.create_line(dataFile, line_id);
+                    } else if (inputs[index].id.split("_")[0] == "port") {
+                        me.create_port(inputs[index].id.split("_")[1] + ".geojson", inputs[index].id.split("_")[1]);
+                    }
+                } else {
+                    //unChecked的時後
+                    if (inputs[index].id.split("_")[0] == "line") {
+                        var line_id = inputs[index].id.split("_")[1];
+                        //d3.select("g.leaflet-zoom-hide")
+                        //    .selectAll("g.g"+line_id).remove();
+                        var gid = "g."+"g" + line_id;
+                        d3.select("g.leaflet-zoom-hide").selectAll(gid)
+                           .transition().duration(900).style("visibility", "hidden");
+                        
+                    } else if (inputs[index].id.split("_")[0] == "port") {
+                        var line_id = inputs[index].id.split("_")[1];
+                        var gid = "g."+"port" + line_id;
+                        d3.select("g.leaflet-zoom-hide").selectAll(gid)
+                           .transition().duration(900).style("visibility", "hidden");
+                    }
+                }
+            }
+        }
+
+        var currentShipline = null;
+        var shipline_jsonObject = {};
+        CustomLayer.prototype.create_line = function(data, line_id){
+            var me = this;
+            var objId = "g."+"g" + line_id;
+            if(shipline_jsonObject[objId] == null){
+                //如果此shipline物件不存在時，則建立此shipline物件
+                    var shiplineObj = new Shipline(me, data, line_id, one_g);
+                    shipline_jsonObject[objId] = shiplineObj;
+                    currentShipline = shiplineObj;
+            }else{
+                //如果此shipline物件已經存在時
+                var shiplineObj = shipline_jsonObject[objId];
+                d3.select("g.leaflet-zoom-hide").selectAll(objId)
+                          .transition().duration(900).style("visibility", "visible");
+                //if(!shiplineObj.isD3ShiplineExist) shiplineObj.create();
+                //currentShipline = shiplineObj;
+                shiplineObj.reDraw();
+
+
+            }
+        }
+
+        var portEdge_jsonObject = {};
+        CustomLayer.prototype.create_port = function(data, line_id){
+            var me = this;
+            var objId = "g."+"port" + line_id;
+
+            if(portEdge_jsonObject[objId] == null){
+                //如果此portEdge物件不存在時，則建立此portEdge物件
+                    var portEdgeObj = new portEdge(me, data, line_id, one_g);
+                    portEdge_jsonObject[objId] = portEdgeObj;
+
+            }else{
+                //如果此shipline物件已經存在時
+                var portEdgeObj = portEdge_jsonObject[objId];
+                d3.select("g.leaflet-zoom-hide").selectAll(objId)
+                          .transition().duration(900).style("visibility", "visible");
+            }
+        }
+
+
+        function portEdge(myCustomLayer, data, line_id, one_gX){
+            var me = this;
+            me.isD3PortEdgeExist = false;
+            me.myCustomLayer = myCustomLayer;
+            me.one_gX = one_gX;
+            me.data = data;
+            me.line_id = line_id;
+            me.create();
+        }
+
+        portEdge.prototype.create = function () {
+            var me = this;
+                        const g = me.one_gX.append("g")
+                                       .attr("class", "port" + me.line_id)
+                                       .attr("id", "port" + me.line_id);
+                        d3.json(me.data, function(port) {
+                            me.toLine2 = d3.line()
+                                .curve(d3.curveLinear)
+                                .x((d) => me.myCustomLayer.applyLatLngToLayer(d).x)
+                                .y((d) => me.myCustomLayer.applyLatLngToLayer(d).y);
+                            me.linePath2 = g.selectAll(".boundpath")
+                                .data([port.features])
+                                .enter()
+                                .append("path")
+                                .attr("class", "boundpath")
+                                .attr("id", me.line_id);
+
+                            me.linePath2.attr("d", me.toLine2);
+
+                            svg.attr("width", 629 + 2000)
+                                .attr("height", 313 + 2500)
+                                .style("left", 499 - 2000 + "px")
+                                .style("top", 156 - 2000 + "px");
+
+                            me.isD3PortEdgeExist = true;
+                        });
+        }
+
+        function Shipline(myCustomLayer, data, line_id, one_gX){
+            me = this;
+            me.isD3ShiplineExist = false;
+            me.myCustomLayer = myCustomLayer;
+            me.one_gX = one_gX;
+            me.data = data;
+            me.line_id = line_id;
+            me.create();
+        }
+
+        Shipline.prototype.create = function () {
+            var me = this;
+                        const g = me.one_gX.append("g")
+                                       .attr("class", "g" + me.line_id)
+                                       .attr("id", "g" + me.line_id);
+                        d3.json(me.data, function(collection) {
+                            me.collection = collection;
+                            me.featuresdata = collection.features;
+                            me.toLine = d3.line()
+                                .curve(d3.curveLinear)
+                                .x((d) => me.myCustomLayer.applyLatLngToLayer(d).x)
+                                .y((d) => me.myCustomLayer.applyLatLngToLayer(d).y);
+                            me.linePath = g.selectAll(".lineConnect")
+                                .data([me.featuresdata])
+                                .enter()
+                                .append("path")
+                                .attr("id", me.line_id)
+                                .attr("class", "lineConnect");
+                            /*
+                            me.marker = g.append("circle")
+                                .attr("r", 10)
+                                .attr("id", me.line_id)
+                                .attr("class", "travelMarker");
+                            */
+                            /*
+                            me.marker = g.append('rect')
+                                .attr('width', 25).attr('height', 10)
+                                .attr("id", me.line_id)
+                                .attr("class", "travelMarker");
+                            */
+                            var width = 20;
+                            var height = 25;
+                            var heightx = 55;
+
+                            me.marker = g.append("path")
+                                .attr("transform", "rotate(45)")
+                                .attr("d", "M 0 " + (-heightx/3) + " L " + (-width/3) + " " + (height/3) + "L " + (width/3) + " " + (height/3) + " Z")
+                                .style("fill","#dd4237");
+
+
+                            me.marker_start = g.selectAll("g.start_end_point")
+                                .data([me.featuresdata[0]])
+                                .enter()
+                                .append('g')
+                                .attr('class', '.start_end_point');
+
+                            me.marker_start
+                                .append("circle", )
+                                .attr("id", me.line_id)
+                                .attr("r", 5)
+                                .style("fill", "red")
+                                .style("opacity", "1");
+
+                            /*
+                            me.marker_start.append("g")
+                                .attr("id", me.line_id)
+                                .attr("transform", "rotate(45)")
+                                //.attr("transform","translate(" + (width/2) + "," + (height/2) + ")")
+                              .append("path")
+                                .attr("d", "M 0 " + (-height/3) + " L " + (-width/3) + " " + (height/3) + "L " + (width/3) + " " + (height/3) + " Z")
+                                .style("fill","#dd4237");
+                            */
+                            me.isD3ShiplineExist = true;
+                            me.reDraw();
+                        });
+        }
+
+        Shipline.prototype.reDraw = function () {
+            var me = this;
+
+                            reset();
+                            transitionX();
+
+                            //var geojson = [];
+                            //var pointlength = 0;
+
+                            function reset() {
+                                var bounds = d3path.bounds(me.collection),
+                                    topLeft = bounds[0],
+                                    bottomRight = bounds[1];
+
+                                me.marker_start.attr("transform", d => "translate(" + me.myCustomLayer.applyLatLngToLayer(d).x + "," + me.myCustomLayer.applyLatLngToLayer(d).y + ")");
+
+                                //jpyuxx ptFeatures.attr("transform", d => "translate(" + //me.applyLatLngToLayer(d).x + "," + //me.applyLatLngToLayer(d).y + ")");
+
+                                me.marker
+                                    .attr("transform", function() {
+                                       return "rotate(45)";
+                                    })
+                                    .attr("transform", function() {
+                                    const coords = me.featuresdata[0].geometry.coordinates;
+                                    const pt = me.myCustomLayer.proj.fromMapToDiv(new TGOS.TGPoint(coords[0], coords[1]));
+                                    return "translate(" + pt.x + "," + pt.y + ")";
+                                     })
+                                    .style("opacity", "0");
+
+                                svg.attr("width", bottomRight[0] + 2000)
+                                    .attr("height", bottomRight[1] + 2500)
+                                    .style("left", topLeft[0] - 2000 + "px")
+                                    .style("top", topLeft[1] - 2000 + "px");
+
+
+                                me.linePath.attr("d", me.toLine);
+                            }
+        /*
+                            var count;
+                            var today, month, dat, hrs, min;
+                            var debug_count;
+                            var stop_count;
+        */
+                            function transitionX() {
+                                me.linePath.transition()
+                                    .duration(5000)
+                                    .attrTween("stroke-dasharray", tweenDashX)
+        //                            .on("interrupt", function() {
+        //                            })
+                                    .on("end", null);
+                                    //.on("end", transition); // Restart the transition at it's end
+                                console.log("Stop!");
+                                count = 0;
+
+                                //now = new Date(collection.Start_Time);
+                                /*
+                                sec = now.getSeconds();
+
+                                today = now.getFullYear();
+                                month = now.getMonth();
+                                dat = now.getDate();
+                                hrs = now.getHours();
+                                min = now.getMinutes();
+                                */
+                            }
+
+                            function tweenDashX() {
+                                return function(t) {
+                                    //console.log("t="+t);
+                                    //total length of path (single value)
+                                    var len = me.linePath.node().getTotalLength();
+                                    interpolator = d3.interpolateString("0," + len, len + "," + len);
+                                    //var p =getNewLocation(time)
+                                    var p = me.linePath.node().getPointAtLength(t * len);
+
+                                    //Move the marker to that point
+                                    me.marker
+                                        .attr("transform", function() {
+                                          return "rotate(45)";
+                                         })
+                                        .attr("transform", "translate(" + p.x + "," + p.y + ")")
+                                        .style("opacity", "0.9");
+
+                                    count++;
+                                    debug_count = Math.floor((count * 100) / 1760);
+                                    if (me.featuresdata[debug_count] == null) {
+                                        debug_count = 0;
+                                    }
+                                    if (animation == true) {
+                                        stop_count = debug_count;
+                                    }
+                                    //alpha = 0;  //jpyuxx
+                                    //                            alpha = featuresdata[debug_count].properties.COG;
+                                    if (count % 10 == 0) {
+                                        alpha = Math.floor(Math.random() * 30) + 120;
+                                    }
+
+                                    if (document.getElementById('mySelect').options[document.getElementById('mySelect').selectedIndex] == null) {} else if (document.getElementById('mySelect').options[document.getElementById('mySelect').selectedIndex].text == me.line_id) {
+                                        if(typeof (alpha) != 'undefined'){  //jpyuxx
+                                           redTriangle.transform('R' + (alpha) + ',' + (paperWidth / 2) + ', ' + paperHeight / 2);
+                                        }
+
+                                        var tatext = "<tr><th>ShipName</th><th>" + me.collection.ShipName + "</th></tr>" +
+                                            "<tr><td>MMSI</td><td>" + me.collection.MMSI + "</td></tr>" +
+                                            "<tr><td>ShipType</td><td>" + me.collection.Ship_and_Cargo_Type + "</td></tr>" +
+                                            "<tr><td>Destination</td><td>" + me.collection.Destination + "</td></tr>" +
+                                            "<tr><td>StartTime</td><td>" + me.collection.Start_Time + "</td></tr>" +
+                                            "<tr><td>Longitude</td><td>" + me.featuresdata[debug_count].geometry.coordinates[0] + "</td></tr>" +
+                                            "<tr><td>Latitude</td><td>" + me.featuresdata[debug_count].geometry.coordinates[1] + "</td></tr>" +
+                                            "<tr><td>SOG</td><td>" + me.featuresdata[debug_count].properties.SOG + "</td></tr>" ;
+                                        document.getElementById("myTable").innerHTML = tatext;
+
+                                        me.marker.style("fill", "purple");
+                                    } else {
+                                        me.marker.style("fill", "green");
+                                    }
+                                    //若用null的話，完整的trajectory將會被先畫出
+
+                                    return interpolator(t);//null
+                                }
+                            }
+        }
+
+        Shipline.prototype.transition = function () {
+            var me = this;
+
+                                me.linePath.transition()
+                                    .duration(5000)
+                                    .attrTween("stroke-dasharray", me.tweenDash())
+        //                            .on("interrupt", function() {
+        //                            })
+                                    .on("end", null);
+                                    //.on("end", transition); // Restart the transition at it's end
+                                console.log("Stop!");
+                                count = 0;
+
+                                //now = new Date(collection.Start_Time);
+                                /*
+                                sec = now.getSeconds();
+
+                                today = now.getFullYear();
+                                month = now.getMonth();
+                                dat = now.getDate();
+                                hrs = now.getHours();
+                                min = now.getMinutes();
+                                */
+        }
+
+        Shipline.prototype.tweenDash = function () {
+            var me = this;
+
+                                return function(t) {
+                                    //console.log("t="+t);
+                                    //total length of path (single value)
+                                    var len = me.linePath.node().getTotalLength();
+                                    console.log("len="+len);
+                                    interpolator = d3.interpolateString("0," + len, len + "," + len+" t="+t);
+                                    //var p =getNewLocation(time)
+                                     t = 0.5;
+                                    var p = me.linePath.node().getPointAtLength(t * len);
+
+                                    //Move the marker to that point
+                                    me.marker
+                                        .attr("transform", function() {
+                                          return "rotate(45)";
+                                         })
+                                        .attr("transform", "translate(" + p.x + "," + p.y + ")")
+                                    style("opacity", "0.9");
+
+                                    count++;
+                                    debug_count = Math.floor((count * 100) / 1760);
+                                    if (me.featuresdata[debug_count] == null) {
+                                        debug_count = 0;
+                                    }
+                                    if (animation == true) {
+                                        stop_count = debug_count;
+                                    }
+                                    //alpha = 0;  //jpyuxx
+                                    //                            alpha = featuresdata[debug_count].properties.COG;
+                                    if (count % 10 == 0) {
+                                        alpha = Math.floor(Math.random() * 30) + 120;
+                                    }
+
+                                    if (document.getElementById('mySelect').options[document.getElementById('mySelect').selectedIndex] == null) {} else if (document.getElementById('mySelect').options[document.getElementById('mySelect').selectedIndex].text == me.line_id) {
+                                        if(typeof (alpha) != 'undefined'){  //jpyuxx
+                                           redTriangle.transform('R' + (alpha) + ',' + (paperWidth / 2) + ', ' + paperHeight / 2);
+                                        }
+
+                                        var tatext = "<tr><th>ShipName</th><th>" + me.collection.ShipName + "</th></tr>" +
+                                            "<tr><td>MMSI</td><td>" + me.collection.MMSI + "</td></tr>" +
+                                            "<tr><td>ShipType</td><td>" + me.collection.Ship_and_Cargo_Type + "</td></tr>" +
+                                            "<tr><td>Destination</td><td>" + me.collection.Destination + "</td></tr>" +
+                                            "<tr><td>StartTime</td><td>" + me.collection.Start_Time + "</td></tr>" +
+                                            "<tr><td>Longitude</td><td>" + me.featuresdata[debug_count].geometry.coordinates[0] + "</td></tr>" +
+                                            "<tr><td>Latitude</td><td>" + me.featuresdata[debug_count].geometry.coordinates[1] + "</td></tr>" +
+                                            "<tr><td>SOG</td><td>" + me.featuresdata[debug_count].properties.SOG + "</td></tr>" ;
+                                        document.getElementById("myTable").innerHTML = tatext;
+
+                                        me.marker.style("fill", "purple");
+                                    } else {
+                                        me.marker.style("fill", "green");
+                                    }
+                                    //若用null的話，完整的trajectory將會被先畫出
+
+                                    return interpolator(t);//null
+                                }
+        }
+
+        function input_click(input_id, optiontext) {
+            console.log("xinput_click()");
+            //var customLayer1 = new CustomLayer(map);
+            //if(customLayer1 == null) customLayer1 = new CustomLayer(map);
+            if (input_id.split("_")[0] == "line") {
+                if (document.getElementById(input_id).checked == true) {
+                    var option = document.createElement("option");
+                    option.text = optiontext;
+                    document.getElementById('mySelect').add(option);
+                } else {
+                    var selectobject = document.getElementById("mySelect");
+                    for (var i = 0; i < selectobject.length; i++) {
+                        if (selectobject.options[i].value == optiontext)
+                            selectobject.remove(i);
+                    }
+                    document.getElementById('myTable').innerHTML = '';
+                }
+            }
+            customLayer1.checkShipStatus();
+        }
+
+        function playAllShiplines(){
+            for(var key in shipline_jsonObject){
+                shipline_jsonObject[key].reDraw();
+            }
+        }
+
+        function deleteAllShiplines(){
+            for(var key in shipline_jsonObject){
+                d3.select("g.leaflet-zoom-hide").selectAll(key).remove();
+                shipline_jsonObject[key].isD3ShiplineExist = false;
+            }
+        }
+
+        function btnSearch_click() {
+            var starttime = document.getElementById("StartLocalDate").value;
+            var endtime = document.getElementById("EndLocalDate").value;
+
+            d3.select("g.leaflet-zoom-hide").selectAll("*").remove();
+            document.getElementById('treelist').innerHTML = '';
+            document.getElementById('mySelect').innerHTML = '';
+            document.getElementById('myTable').innerHTML = '';
+            treedata_forline();
+            treedata_forboundary();
+        }
+
+
+        function animation_click() {
+            var anibtn = document.getElementById("anibtn");
+            if (animation == false) {
+                anibtn.innerHTML = "Play";
+                console.log(animation);
+                animation = true;
+                d3.selectAll(".lineConnect").transition();
+            } else {
+                anibtn.innerHTML = "Pause";
+                console.log(animation);
+                animation = false;
+
+            }
+            //playAllShiplines();
+        }
+
+        function treedata_forline() {
+            $.getJSON("data/all_line_2.json", function(jsonData) {
+                $.each(jsonData, function(key, val) {
+                    if (key == "ship_line") {
+                        var li = document.createElement("li");
+                        li.id = "li_" + "船型分類";
+                        li.innerHTML = "<span class=\"caret active caret-down\">" + "船型分類";
+                        var ul = document.createElement("ul");
+                        ul.id = "ul_" + "船型分類";
+                        ul.setAttribute("class", "nested active");
+                        document.getElementById('treelist').appendChild(li);
+                        document.getElementById(li.id).appendChild(ul);
+                        for (var i = 0; i < val.length; i++) {
+                            var li_addchild;
+                            var ul_addchild;
+                            if (document.getElementById("li_" + val[i].ship_type) == null) {
+                                li_addchild = document.createElement("li");
+                                li_addchild.id = "li_" + val[i].ship_type;
+                                li_addchild.innerHTML = "<span class=\"caret\">" + val[i].ship_type;
+                                console.log(val[i].ship_type);
+
+                                ul_addchild = document.createElement("ul");
+                                ul_addchild.id = "ul_" + val[i].ship_type;
+                                ul_addchild.setAttribute("class", "nested");
+                                document.getElementById(ul.id).appendChild(li_addchild);
+                                document.getElementById(li_addchild.id).appendChild(ul_addchild);
+                            }
+                            var li_child = document.createElement("li");
+                            li_child.id = "li_child_" + val[i].mmsi;
+
+                            var label = "<label>" + val[i].mmsi + "</label>"
+                            li_child.innerHTML = label;
+
+                            var input = document.createElement("input");
+                            input.type = "checkbox"
+                            input.id = "line_" + val[i].mmsi;
+
+                            document.getElementById("ul_" + val[i].ship_type).appendChild(li_child);
+                            document.getElementById(li_child.id).appendChild(input);
+
+                            var optiontext = val[i].mmsi;
+                            $(document.getElementById(input.id)).attr("onclick", "input_click(\"" + input.id + "\", \"" + optiontext + "\")");
+                        }
+                    }
+                });
+            });
+        }
+
+        function treedata_forboundary() {
+            $.getJSON("boundary_line.json", function(jsonData) {
+                $.each(jsonData, function(key, val) {
+                    if (key == "boundary_line") {
+                        var li = document.createElement("li");
+                        li.id = "li_" + "港口輪廓線";//key;
+                        li.innerHTML = "<span class=\"caret active caret-down\">" + "港口輪廓線";//key;
+                        var ul = document.createElement("ul");
+                        ul.id = "ul_" + "港口輪廓線";//key;
+                        ul.setAttribute("class", "nested active");
+                        document.getElementById('treelist').appendChild(li);
+                        document.getElementById(li.id).appendChild(ul);
+                        for (var i = 0; i < val.length; i++) {
+                            var li_child = document.createElement("li");
+                            li_child.id = "li_child_" + val[i].open_file;
+
+                            var label = "<label>" + val[i].open_file.split(".")[0] + "</label>"
+                            li_child.innerHTML = label;
+
+                            var input = document.createElement("input");
+                            input.type = "checkbox"
+                            input.id = "port_" + val[i].open_file;
+
+                            document.getElementById(ul.id).appendChild(li_child);
+                            document.getElementById(li_child.id).appendChild(input);
+
+                            var optiontext = val[i].open_file;
+                            $(document.getElementById(input.id)).attr("onclick", "input_click(\"" + input.id + "\", \"" + optiontext + "\")");
+                        }
+                    }
+                });
+                var toggler = document.getElementsByClassName("caret");
+                for (var i = 0; i < toggler.length; i++) {
+                    toggler[i].addEventListener("click", function() {
+                        this.parentElement.querySelector(".nested").classList.toggle("active");
+                        this.classList.toggle("caret-down");
+                    });
+                }
+            });
+        }
+
+        $(document).ready(function() {
+            mapDiv = document.getElementById("mapDiv");
+            map = new TGOS.TGOnlineMap(mapDiv, TGOS.TGCoordSys.EPSG3857);
+            map.setCenter(new TGOS.TGPoint(120.314348, 22.596926)); //初始地圖中心點
+            map.setZoom(12); //初始地圖縮放層級
+
+            if(customLayer1 == null) customLayer1 = new CustomLayer(map);
+
+            treedata_forline();
+            treedata_forboundary();
+
+            var now = new Date();
+        });
+
+    </script>
+</body>
